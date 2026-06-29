@@ -211,8 +211,8 @@ class Client:
             return {"code": 999, "msg": "验证码登录时未记录的错误：" + str(e)}
 
     def get_info(self):
-        """获取个人信息"""
-        url = urljoin(self.base_url, "xsxxxggl/xsxxwh_cxCkDgxsxx.html?gnmkdm=N100801")
+        """使用新 API 获取个人信息"""
+        url = urljoin(self.base_url, "xtgl/index_cxYhxxIndex.html?xt=jw&localeKey=zh_CN&gnmkdm=index")
         try:
             req_info = self.sess.get(
                 url,
@@ -222,40 +222,52 @@ class Client:
             )
             if req_info.status_code != 200:
                 return {"code": 2333, "msg": "教务系统挂了"}
+
             doc = pq(req_info.text)
-            if doc("h5").text() == "用户登录":
+            if doc("h5").text() == "用户登录" or doc("title").text() == "用户登录":
                 return {"code": 1006, "msg": "未登录或已过期，请重新登录"}
-            info = req_info.json()
-            if info is None:
-                return self._get_info()
+
+            # 解析姓名：HTML 中的结构为 <h4 class="media-heading">姓名&nbsp;&nbsp;身份</h4>
+            raw_name = doc("h4.media-heading").text()
+            name = raw_name.split()[0] if raw_name else ""
+
+            # 解析学院与班级：HTML 中的结构为 <p>学院名称 班级名称</p>
+            raw_college_class = doc("div.media-body p").text()
+            college_class_parts = raw_college_class.split()
+            college_name = college_class_parts[0] if len(college_class_parts) > 0 else ""
+            class_name = college_class_parts[1] if len(college_class_parts) > 1 else ""
+
+            # 组装数据：指定字段获取，其余留空
             result = {
-                "sid": info.get("xh"),
-                "name": info.get("xm"),
-                "college_name": info.get("zsjg_id", info.get("jg_id")),
-                "major_name": info.get("zszyh_id", info.get("zyh_id")),
-                "class_name": info.get("bh_id", info.get("xjztdm")),
-                "status": info.get("xjztdm"),
-                "enrollment_date": info.get("rxrq"),
-                "candidate_number": info.get("ksh"),
-                "graduation_school": info.get("byzx"),
-                "domicile": info.get("jg"),
-                "postal_code": info.get("yzbm"),
-                "politics_status": info.get("zzmmm"),
-                "nationality": info.get("mzm"),
-                "education": info.get("pyccdm"),
-                "phone_number": info.get("sjhm"),
-                "parents_number": info.get("gddh"),
-                "email": info.get("dzyx"),
-                "birthday": info.get("csrq"),
-                "id_number": info.get("zjhm"),
+                "sid": os.environ.get("USERNAME", ""),
+                "name": name,
+                "college_name": college_name,
+                "major_name": "",
+                "class_name": class_name,
+                "status": "",
+                "enrollment_date": "",
+                "candidate_number": "",
+                "graduation_school": "",
+                "domicile": "",
+                "postal_code": "",
+                "politics_status": "",
+                "nationality": "",
+                "education": "",
+                "phone_number": "",
+                "parents_number": "",
+                "email": "",
+                "birthday": "",
+                "id_number": "",
             }
+
             return {"code": 1000, "msg": "获取个人信息成功", "data": result}
+
         except exceptions.Timeout:
             return {"code": 1003, "msg": "获取个人信息超时"}
         except (
-            exceptions.RequestException,
-            json.decoder.JSONDecodeError,
-            AttributeError,
+                exceptions.RequestException,
+                json.decoder.JSONDecodeError,
+                AttributeError,
         ):
             traceback.print_exc()
             return {
@@ -264,7 +276,7 @@ class Client:
             }
         except Exception as e:
             traceback.print_exc()
-            return {"code": 999, "msg": "获取个人信息时未记录的错误：" + str(e)}
+            return {"code": 999, "msg": f"获取个人信息时未记录的错误：{str(e)}"}
 
     def _get_info(self):
         """获取个人信息"""
