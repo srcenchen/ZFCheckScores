@@ -260,13 +260,12 @@ exam_updated = exam_content != old_exam_content
 any_update = grade_updated or exam_updated
 
 # 构建推送标题
-if any_update or force_push_message:
-    update_parts = []
-    if grade_updated:
-        update_parts.append("成绩已更新")
-    if exam_updated:
-        update_parts.append("考试安排已更新")
-    push_title_text = "、".join(update_parts) if update_parts else "教务管理系统推送"
+update_parts = []
+if grade_updated:
+    update_parts.append("成绩已更新")
+if exam_updated:
+    update_parts.append("考试安排已更新")
+push_title_text = "、".join(update_parts) if update_parts else "消息推送"
 
 grades_updated_push_integrated_send_info = (
     f"{'强制推送信息成功' if force_push_message else '教务管理系统' + push_title_text}\n"
@@ -274,8 +273,8 @@ grades_updated_push_integrated_send_info = (
     f"{integrated_send_info}"
 )
 
-# 用于兼容旧变量名
-_push_title = "正方教务管理系统" + ("成绩推送" if not any_update else push_title_text)
+# 用于推送的标题
+_push_title = "正方教务管理系统" + push_title_text
 
 if error_content and "成绩为空" not in run_log:
     error_content = "、".join(map(str, error_content))
