@@ -1,5 +1,6 @@
 import time
 import traceback
+from datetime import datetime
 
 
 def get_exam_schedule(student_client, output_type="none"):
@@ -34,44 +35,54 @@ def get_exam_schedule(student_client, output_type="none"):
                         exam["title"].replace("（", "(").replace("）", ")")
                     )
 
-            # 按照考试时间降序排序（最新/最近要考的排最前面）
-            # 对于没有考试时间的，将时间设置为 1970-01-01 00:00:00，确保排在最后
+            # 过滤未结束的考试（考试日期 >= 今天），已过期的不再显示
+            today_str = datetime.now().strftime("%Y-%m-%d")
+            upcoming_exams = [
+                e for e in exam_schedule
+                if e.get("time") and e["time"][:10] >= today_str
+            ]
+
+            # 按照考试时间升序排序（最近要考的排最前面）
+            # 对于没有考试时间的，将时间设置为 9999-12-31，确保排在最后
             sorted_exam = sorted(
-                exam_schedule,
+                upcoming_exams,
                 key=lambda x: (
                     x.get("time")
                     if x.get("time")
-                    else "1970-01-01 00:00:00"
+                    else "9999-12-31 23:59:59"
                 ),
-                reverse=True,
+                reverse=False,
             )
+
+            # 最近一场考试时间
+            last_exam_time = sorted_exam[0].get("time") if sorted_exam else ""
 
             # 初始化输出考试安排信息字符串
             integrated_exam_info = "------\n考试安排信息："
 
-            # 遍历所有考试安排
-            for _, exam in enumerate(sorted_exam):
+            if not sorted_exam:
+                integrated_exam_info += "\n暂无未结束的考试安排\n------"
+            else:
+                # 遍历所有未结束的考试安排
+                for _, exam in enumerate(sorted_exam):
 
-                # 清理教师名称，去除工号前缀 (如 "880382/徐鹤鸣" -> "徐鹤鸣")
-                teacher_raw = exam.get('teacher') or ''
-                teacher_clean = teacher_raw.split('/')[-1] if '/' in teacher_raw else teacher_raw
+                    # 清理教师名称，去除工号前缀 (如 "880382/徐鹤鸣" -> "徐鹤鸣")
+                    teacher_raw = exam.get('teacher') or ''
+                    teacher_clean = teacher_raw.split('/')[-1] if '/' in teacher_raw else teacher_raw
 
-                # 整合考试安排信息
-                integrated_exam_info += (
-                    f"\n"
-                    f"课程名称：{exam.get('title')}\n"
-                    f"考试时间：{exam.get('time')}\n"
-                    f"考试地点：{exam.get('location')}\n"
-                    f"任课教师：{teacher_clean}\n"
-                    f"教学班：{exam.get('class_name')}\n"
-                    f"考试批次：{exam.get('exam_name')}\n"
-                    f"重修标记：{exam.get('retake_flag') or '否'}\n"
-                    f"备注：{exam.get('remarks') or '无'}\n"
-                    f"------"
-                )
-
-            # 最近一场考试时间
-            last_exam_time = sorted_exam[0].get("time") if sorted_exam else ""
+                    # 整合考试安排信息
+                    integrated_exam_info += (
+                        f"\n"
+                        f"课程名称：{exam.get('title')}\n"
+                        f"考试时间：{exam.get('time')}\n"
+                        f"考试地点：{exam.get('location')}\n"
+                        f"任课教师：{teacher_clean}\n"
+                        f"教学班：{exam.get('class_name')}\n"
+                        f"考试批次：{exam.get('exam_name')}\n"
+                        f"重修标记：{exam.get('retake_flag') or '否'}\n"
+                        f"备注：{exam.get('remarks') or '无'}\n"
+                        f"------"
+                    )
 
             if output_type == "raw":
                 return exam_schedule
