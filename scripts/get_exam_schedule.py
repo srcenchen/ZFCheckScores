@@ -66,21 +66,13 @@ def get_exam_schedule(student_client, output_type="none"):
                 # 遍历所有未结束的考试安排
                 for _, exam in enumerate(sorted_exam):
 
-                    # 清理教师名称，去除工号前缀 (如 "880382/徐鹤鸣" -> "徐鹤鸣")
-                    teacher_raw = exam.get('teacher') or ''
-                    teacher_clean = teacher_raw.split('/')[-1] if '/' in teacher_raw else teacher_raw
-
                     # 整合考试安排信息
                     integrated_exam_info += (
                         f"\n"
                         f"课程名称：{exam.get('title')}\n"
                         f"考试时间：{exam.get('time')}\n"
                         f"考试地点：{exam.get('location')}\n"
-                        f"任课教师：{teacher_clean}\n"
-                        f"教学班：{exam.get('class_name')}\n"
                         f"考试批次：{exam.get('exam_name')}\n"
-                        f"重修标记：{exam.get('retake_flag') or '否'}\n"
-                        f"备注：{exam.get('remarks') or '无'}\n"
                         f"------"
                     )
 
