@@ -59,13 +59,13 @@ def get_grade(student_client, output_type="none"):
                 reverse=True,
             )
 
-            # 只保留最近1个月的成绩，过滤掉更早的成绩
-            one_month_ago = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+            # 只保留最近2.5个月的成绩，过滤掉更早的成绩
+            cutoff_days_ago = (datetime.now() - timedelta(days=75)).strftime("%Y-%m-%d")
             recent_grade = [
                 c for c in sorted_grade
-                if c.get("submission_time") and c["submission_time"][:10] >= one_month_ago
+                if c.get("submission_time") and c["submission_time"][:10] >= cutoff_days_ago
             ]
-            # 如果最近1个月有成绩就用过滤后的，否则回退到全部成绩（避免完全空）
+            # 如果最近2.5个月有成绩就用过滤后的，否则回退到全部成绩
             if recent_grade:
                 sorted_grade = recent_grade
 
