@@ -7,6 +7,7 @@ from scripts.user_login import login
 from scripts.get_user_info import get_user_info
 from scripts.get_grade import get_grade
 from scripts.get_selected_courses import get_selected_courses
+from scripts.get_exam_schedule import get_exam_schedule
 from scripts.push import send_message
 from datetime import datetime
 
@@ -46,6 +47,8 @@ folder_path = "data"
 info_file_path = os.path.join(folder_path, "info.txt")
 grade_file_path = os.path.join(folder_path, "grade.txt")
 old_grade_file_path = os.path.join(folder_path, "old_grade.txt")
+exam_file_path = os.path.join(folder_path, "exam.txt")
+old_exam_file_path = os.path.join(folder_path, "old_exam.txt")
 
 # 初始化运行次数
 run_count = 2
@@ -148,13 +151,59 @@ for _ in range(run_count):
     # 加密保存成绩
     encrypted_integrated_grade_info = md5_encrypt(integrated_grade_info)
 
+    # ----- 考试安排处理 -----
+    # 如果exam.txt文件不存在,则创建文件
+    if not os.path.exists(exam_file_path):
+        open(exam_file_path, "w").close()
+
+    # 清空old_exam.txt文件内容
+    with open(old_exam_file_path, "w") as old_exam_file:
+        old_exam_file.truncate()
+
+    # 将exam.txt文件中的内容写入old_exam.txt文件内
+    with open(exam_file_path, "r") as exam_file, open(old_exam_file_path, "w") as old_exam_file:
+        old_exam_file.write(exam_file.read())
+
+    # 获取考试安排信息
+    exam_schedule_raw = get_exam_schedule(student_client, output_type="raw")
+
+    if not exam_schedule_raw:
+        # 考试安排为空
+        integrated_exam_info = "------\n考试安排信息：\n考试安排为空\n------"
+        run_log += "考试安排为空\n"
+
+    elif "获取考试安排时出错" in str(exam_schedule_raw):
+        # 获取考试安排时出错
+        integrated_exam_info = "------\n考试安排信息：\n获取考试安排时出错\n------"
+        error_content.append("获取考试安排时出错")
+
+    else:
+        # 清空exam.txt文件内容
+        with open(exam_file_path, "w") as exam_file:
+            exam_file.truncate()
+
+        # 获取整合后的考试安排信息
+        integrated_exam_info = get_exam_schedule(student_client, output_type="integrated_exam_info")
+
+        # 加密保存考试安排
+        encrypted_integrated_exam_info = md5_encrypt(integrated_exam_info)
+
+        # 将加密后的考试安排信息写入exam.txt文件
+        with open(exam_file_path, "w") as exam_file:
+            exam_file.write(encrypted_integrated_exam_info)
+
+    # 加密保存考试安排
+    encrypted_integrated_exam_info = md5_encrypt(integrated_exam_info)
+
 # 读取grade.txt和old_grade.txt文件的内容
 with open(grade_file_path, "r") as grade_file, open(old_grade_file_path, "r") as old_grade_file:
     grade_content = grade_file.read()
     old_grade_content = old_grade_file.read()
 
-# 整合MD5值
-integrated_grade_info += f"\n" f"MD5：{encrypted_integrated_grade_info}"
+# 读取exam.txt和old_exam.txt文件的内容
+with open(exam_file_path, "r") as exam_file, open(old_exam_file_path, "r") as old_exam_file:
+    exam_content = exam_file.read()
+    old_exam_content = old_exam_file.read()
 
 # 获取未公布成绩的课程和异常的课程
 selected_courses_filtering = get_selected_courses(student_client)
@@ -192,6 +241,7 @@ first_run_text = (
 # 若是在 Github Actions 等平台运行,请不要使用print(integrated_send_info)
 integrated_send_info = (
     f"{integrated_info}\n"
+    f"{integrated_exam_info}\n"
     f"{integrated_grade_info}\n"
     f"{selected_courses_filtering}\n"
     f"{workflow_info if github_actions else current_time}\n"
@@ -201,12 +251,31 @@ integrated_send_info = (
 # 整合首次运行时需要使用到的所有信息
 first_time_run_integrated_send_info = f"{first_run_text}\n" f"{integrated_send_info}"
 
-# 整合成绩已更新时需要使用到的所有信息
+# 整合成绩或考试安排已更新时需要使用到的所有信息
+# 检测成绩是否有更新
+grade_updated = grade_content != old_grade_content
+# 检测考试安排是否有更新
+exam_updated = exam_content != old_exam_content
+# 是否有任何更新
+any_update = grade_updated or exam_updated
+
+# 构建推送标题
+if any_update or force_push_message:
+    update_parts = []
+    if grade_updated:
+        update_parts.append("成绩已更新")
+    if exam_updated:
+        update_parts.append("考试安排已更新")
+    push_title_text = "、".join(update_parts) if update_parts else "教务管理系统推送"
+
 grades_updated_push_integrated_send_info = (
-    f"{'强制推送信息成功' if force_push_message else '教务管理系统成绩已更新'}\n"
+    f"{'强制推送信息成功' if force_push_message else '教务管理系统' + push_title_text}\n"
     f"------\n"
     f"{integrated_send_info}"
 )
+
+# 用于兼容旧变量名
+_push_title = "正方教务管理系统" + ("成绩推送" if not any_update else push_title_text)
 
 if error_content and "成绩为空" not in run_log:
     error_content = "、".join(map(str, error_content))
@@ -227,30 +296,43 @@ else:
         run_log += f"{first_run_text_response_text}\n"
     else:
         # 对grade.txt和old_grade.txt两个文件的内容进行比对,输出成绩是否更新
-        if grade_content != old_grade_content or force_push_message:
+        if any_update or force_push_message:
 
-            # 如果非第一次运行,则输出成绩信息
+            # 如果非第一次运行,则输出成绩/考试信息
             if grade:
                 run_log += f"新成绩：{encrypted_integrated_grade_info}\n"
                 run_log += f"旧成绩：{old_grade_content}\n"
+            if exam_schedule_raw:
+                run_log += f"新考试安排：{encrypted_integrated_exam_info}\n"
+                run_log += f"旧考试安排：{old_exam_content}\n"
             run_log += "------\n"
 
             # 判断是否选中了强制推送信息
-            run_log += f"{'强制推送信息' if force_push_message else '成绩已更新'}\n"
+            if force_push_message:
+                run_log += "强制推送信息\n"
+            else:
+                if grade_updated:
+                    run_log += "成绩已更新\n"
+                if exam_updated:
+                    run_log += "考试安排已更新\n"
 
             # 推送信息
             response_text = send_message(
                 token,
-                "正方教务管理系统成绩推送",
+                _push_title if not force_push_message else "正方教务管理系统消息推送",
                 grades_updated_push_integrated_send_info,
             )
             # 输出响应内容
             run_log += f"{response_text}"
         else:
-            run_log += "成绩未更新"
+            run_log += "成绩与考试安排均未更新"
             if "成绩为空" not in run_log:
                 last_submission_time = get_grade(student_client, output_type="last_submission_time")
-                run_log += f"\n最近一次更新时间：{last_submission_time}"
+                run_log += f"\n最近一次成绩更新时间：{last_submission_time}"
+            if exam_schedule_raw and "考试安排为空" not in run_log:
+                last_exam_time = get_exam_schedule(student_client, output_type="last_exam_time")
+                if last_exam_time:
+                    run_log += f"\n最近一场考试时间：{last_exam_time}"
 
 # 更新info.txt
 if run_count == 2:

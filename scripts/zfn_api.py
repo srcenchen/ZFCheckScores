@@ -476,6 +476,92 @@ class Client:
             traceback.print_exc()
             return {"code": 999, "msg": "获取成绩时未记录的错误：" + str(e)}
 
+    def get_exam_schedule(self, year: int = 0, term: int = 0):
+        """
+        获取考试安排信息
+        year: 学年，传0表示获取所有学年
+        term: 学期，传0表示获取所有学期（1=第一学期, 2=第二学期）
+        """
+        url = urljoin(
+            self.base_url,
+            "kwgl/kscx_cxXsksxxIndex.html?doType=query&gnmkdm=N358105",
+        )
+        temp_term = term
+        term = term**2 * 3
+        year = "" if year == 0 else year
+        term = "" if term == 0 else term
+        data = {
+            "xnm": str(year),
+            "xqm": str(term),
+            "_search": "false",
+            "nd": int(time.time() * 1000),
+            "queryModel.showCount": "100",
+            "queryModel.currentPage": "1",
+            "queryModel.sortName": "",
+            "queryModel.sortOrder": "asc",
+            "time": "0",
+        }
+        try:
+            req_exam = self.sess.post(
+                url,
+                headers=self.headers,
+                data=data,
+                cookies=self.cookies,
+                timeout=self.timeout,
+            )
+            if req_exam.status_code != 200:
+                return {"code": 2333, "msg": "教务系统挂了"}
+            doc = pq(req_exam.text)
+            if doc("h5").text() == "用户登录":
+                return {"code": 1006, "msg": "未登录或已过期，请重新登录"}
+            exam = req_exam.json()
+            exam_items = exam.get("items")
+            if not exam_items:
+                return {"code": 1005, "msg": "获取内容为空"}
+            result = {
+                "sid": exam_items[0].get("xh", ""),
+                "name": exam_items[0].get("xm", ""),
+                "year": year,
+                "term": temp_term,
+                "count": len(exam_items),
+                "courses": [
+                    {
+                        "course_id": i.get("kch"),
+                        "title": i.get("kcmc"),
+                        "time": i.get("kssj"),
+                        "location": i.get("cdmc"),
+                        "campus": i.get("cdxqmc"),
+                        "seat_number": i.get("zwh"),
+                        "retake_flag": i.get("cxbj", ""),
+                        "exam_name": i.get("ksmc"),
+                        "teacher": i.get("jsxx"),
+                        "class_name": i.get("jxbmc"),
+                        "college": i.get("kkxy"),
+                        "credit": self.align_floats(i.get("xf")),
+                        "exam_method": i.get("ksfs"),
+                        "paper_number": i.get("sjbh"),
+                        "remarks": i.get("bz1", ""),
+                    }
+                    for i in exam_items
+                ],
+            }
+            return {"code": 1000, "msg": "获取考试安排成功", "data": result}
+        except exceptions.Timeout:
+            return {"code": 1003, "msg": "获取考试安排超时"}
+        except (
+            exceptions.RequestException,
+            json.decoder.JSONDecodeError,
+            AttributeError,
+        ):
+            traceback.print_exc()
+            return {
+                "code": 2333,
+                "msg": "请重试，若多次失败可能是系统错误维护或需更新接口",
+            }
+        except Exception as e:
+            traceback.print_exc()
+            return {"code": 999, "msg": "获取考试安排时未记录的错误：" + str(e)}
+
     def get_schedule(self, year: int, term: int):
         """获取课程表信息"""
         url = urljoin(self.base_url, "kbcx/xskbcx_cxXsKb.html?gnmkdm=N2151")
@@ -1539,6 +1625,9 @@ if __name__ == "__main__":
 
     """ 获取成绩 """
     # result = lgn.get_grade(test_year, test_term)
+
+    """ 获取考试安排 """
+    # result = lgn.get_exam_schedule(test_year, test_term)
 
     # 输出结果
     pprint(result)

@@ -12,18 +12,19 @@ def send_message(token, title, content):
     advertise = get_advertise()
     # 如果广告内容不为空，则将广告内容添加到消息内容前
     content = f"{advertise}{content}" if advertise else content
-    # 定义正则表达式模式，用于匹配包含“教学班ID”的行
+    # 定义正则表达式模式，用于匹配包含"教学班ID"的行
     pattern = re.compile(r"^.*教学班ID.*$\n?", re.MULTILINE)
     # 使用正则表达式替换匹配的行为空字符串，并去除前后的空白字符
     content = re.sub(pattern, "", content).strip()
     # 定义一个字典，用于存储需要替换的字符串及其对应的替换值
     replacements = {
-        "------": "\n------\n",  # 替换多连字符为换行后的连字符
-        "个人信息：": "<h1>个人信息</h1>\n",  # 替换“个人信息：”为HTML标题标签
-        "成绩信息：": "<h1>成绩信息</h1>\n",  # 替换“成绩信息：”为HTML标题标签
-        "未公布成绩的课程：": "<h1>未公布成绩的课程</h1>\n",  # 替换“未公布成绩的课程：”为HTML标题标签
-        "工作流信息：": "<h1>工作流信息</h1>\n",  # 替换“工作流信息：”为HTML标题标签
-        "Copyright © 2024 NianBroken. All rights reserved.": "Copyright © 2024 <a href='https://www.klaio.top/' target='_blank'>NianBroken</a>. All rights reserved.",  # 替换版权信息为带有超链接的HTML
+        "------": "\n------\n",
+        "个人信息：": "<h1>个人信息</h1>\n",
+        "考试安排信息：": "<h1>考试安排</h1>\n",
+        "成绩信息：": "<h1>成绩信息</h1>\n",
+        "未公布成绩的课程：": "<h1>未公布成绩的课程</h1>\n",
+        "工作流信息：": "<h1>工作流信息</h1>\n",
+        "Copyright © 2024 NianBroken. All rights reserved.": "Copyright © 2024 <a href='https://www.klaio.top/' target='_blank'>NianBroken</a>. All rights reserved.",
     }
     # 遍历字典中的所有键值对，进行替换操作
     for old, new in replacements.items():
